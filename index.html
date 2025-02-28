@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tetris Dynamique</title>
+    <style>
+        :root {
+            --grid-size: 25px;
+            --grid-color: rgba(255, 255, 255, 0.1);
+            --bg-color: #111;
+            --border-color: #333;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: white;
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            gap: 20px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .game-container {
+            border: 2px solid var(--border-color);
+            border-radius: 4px;
+            position: relative;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            background-color: rgba(0, 0, 0, 0.7);
+            overflow: hidden;
+        }
+
+        #game-board {
+            width: 250px;
+            height: 500px;
+            display: grid;
+            grid-template-columns: repeat(10, var(--grid-size));
+            grid-template-rows: repeat(20, var(--grid-size));
+            gap: 1px;
+            position: relative;
+        }
+
+        .cell {
+            width: var(--grid-size);
+            height: var(--grid-size);
+            border: 1px solid var(--grid-color);
+            box-sizing: border-box;
+            background-color: transparent;
+            transition: background-color 0.1s ease;
+        }
+
+        .occupied {
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: inset 0 0 8px rgba(255, 255, 255, 0.5);
+        }
+
+        .side-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .panel {
+            background-color: rgba(0, 0, 0, 0.7);
+            border: 2px solid var(--border-color);
+            border-radius: 4px;
+            padding: 15px;
+            width: 150px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        #next-piece {
+            display: grid;
+            grid-template-columns: repeat(4, var(--grid-size));
+            grid-template-rows: repeat(4, var(--grid-size));
+            gap: 1px;
+            margin-top: 10px;
+        }
+
+        #score-display, #level-display, #lines-display {
+            margin: 10px 0;
+            font-weight: bold;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        .key-info {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+        }
+
+        .key {
+            background-color: #333;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+
+        #game-over {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            display: none;
+        }
+
+        #game-over h2 {
+            color: #e74c3c;
+            margin-bottom: 20px;
+        }
+
+        #restart-btn {
+            background-color: #e74c3c;
+        }
+
+        #restart-btn:hover {
+            background-color: #c0392b;
+        }
+
+        .power-up {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #f39c12, #e67e22);
+            animation: pulse 1.5s infinite;
+            z-index: 5;
+            cursor: pointer;
+            box-shadow: 0 0 10px #f39c12;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .particles {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .particle {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .line-clear-effect {
+            position: absolute;
+            height: var(--grid-size);
+            width: 100%;
+            background-color: white;
+            animation: clearEffect 0.5s;
+            z-index: 4;
+        }
+
+        @keyframes clearEffect {
+            0% { opacity: 0.8; }
+            100% { opacity: 0; }
+        }
+
+        .power-up-display {
+            display: flex;
+            gap: 5px;
+            margin-top: 10px;
+        }
+
+        .power-up-icon {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: #f39c12;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .shake {
+            animation: shake 0.5s;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+
+        .glow {
+            animation: glow 1s;
+        }
+
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 5px rgba(255, 255, 255, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(255, 255, 255, 0.8); }
+        }
+
+        #background-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="background-canvas"></canvas>
+    <div class="container">
+        <div class="game-container">
+            <div id="game-board"></div>
+            <div id="game-over">
+                <h2>Game Over</h2>
+                <p>Score: <span id="final-score">0</span></p>
+                <button id="restart-btn">Rejouer</button>
+            </div>
+        </div>
+        <div class="side-panel">
+            <div class="panel">
+                <h3>Prochaine Pièce</h3>
+                <div id="next-piece"></div>
+            </div>
+            <div class="panel">
+                <h3>Score</h3>
+                <div id="score-display">0</div>
+                <h3>Niveau</h3>
+                <div id="level-display">1</div>
+                <h3>Lignes</h3>
+                <div id="lines-display">0</div>
+                <h3>Power-ups</h3>
+                <div class="power-up-display" id="power-up-display"></div>
+            </div>
+            <div class="panel">
+                <h3>Contrôles</h3>
+                <div class="controls">
+                    <div class="key-info">
+                        <span>Gauche</span>
+                        <span class="key">←</span>
+                    </div>
+                    <div class="key-info">
+                        <span>Droite</span>
+                        <span class="key">→</span>
+                    </div>
+                    <div class="key-info">
+                        <span>Rotation</span>
+                        <span class="key">↑</span>
+                    </div>
+                    <div class="key-info">
+                        <span>Descente</span>
+                        <span class="key">↓</span>
+                    </div>
+                    <div class="key-info">
+                        <span>Chute</span>
+                        <span class="key">Espace</span>
+                    </div>
+                    <div class="key-info">
+                        <span>Pause</span>
+                        <span class="key">P</span>
+                    </div>
+                </div>
+                <button id="start-btn">Démarrer</button>
+                <button id="pause-btn">Pause</button>
+            </div>
+        </div>
+    </div>
+    <div class="particles" id="particles"></div>
+
+    <script>
+        // Définition des pièces de Tetris avec leurs formes et couleurs
+        const PIECES = [
+            { // I
+                shape: [
+                    [0, 0, 0, 0],
+                    [1, 1, 1, 1],
+                    [0, 0, 0, 0],
+                    [0, 0, 0, 0],
+                ],
+                color: '#00FFFF',
+                glow: '#00CCCC'
+            },
+            { // J
+                shape: [
+                    [1, 0, 0],
+                    [1, 1, 1],
+                    [0, 0, 0]
+                ],
+                color: '#0000FF',
+                glow: '#0000CC'
+            },
+            { // L
+                shape: [
+                    [0, 0, 1],
+                    [1, 1, 1],
+                    [0, 0, 0]
+                ],
+                color: '#FF8800',
+                glow: '#CC6600'
+            },
+            { // O
+                shape: [
+                    [1, 1],
+                    [1, 1]
+                ],
+                color: '#FFFF00',
+                glow: '#CCCC00'
+            },
+            { // S
+                shape: [
+                    [0, 1, 1],
+                    [1, 1, 0],
+                    [0, 0, 0]
+                ],
+                color: '#00FF00',
+                glow: '#00CC00'
+            },
+            { // T
+                shape: [
+                    [0, 1, 0],
+                    [1, 1, 1],
+                    [0, 0, 0]
+                ],
+                color: '#CC00FF',
+                glow: '#9900CC'
+            },
+            { // Z
+                shape: [
+                    [1, 1, 0],
+                    [0, 1, 1],
+                    [0, 0, 0]
+                ],
+                color: '#FF0000',
+                glow: '#CC0000'
+            },
+        ];
+
+        // Pièce bonus spéciale
+        const SPECIAL_PIECE = {
+            shape: [
+                [1, 1, 1],
+                [1, 0, 1],
+                [1, 1, 1]
+            ],
+            color: '#FFFFFF',
+            glow: '#CCCCCC',
+            special: true
+        };
+
+        // Effet de fond d'écran dynamique
+        class BackgroundEffect {
+            constructor() {
+                this.canvas = document.getElementById('background-canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.resize();
+                
+                this.particles = [];
+                this.createParticles();
+                
+                window.addEventListener('resize', () => this.resize());
+                
+                this.animate();
+            }
+            
+            resize() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+                
+                // Recréer les particules après redimensionnement
+                this.particles = [];
+                this.createParticles();
+            }
+            
+            createParticles() {
+                const particleCount = Math.floor(window.innerWidth * window.innerHeight / 10000);
+                
+                for (let i = 0; i < particleCount; i++) {
+                    this.particles.push({
+                        x: Math.random() * this.canvas.width,
+                        y: Math.random() * this.canvas.height,
+                        radius: Math.random() * 2 + 1,
+                        color: `rgba(${Math.floor(Math.random() * 100 + 155)}, ${Math.floor(Math.random() * 100 + 155)}, ${Math.floor(Math.random() * 255)}, ${Math.random() * 0.5 + 0.3})`,
+                        vx: (Math.random() - 0.5) * 0.5,
+                        vy: (Math.random() - 0.5) * 0.5,
+                        sinOffset: Math.random() * Math.PI * 2
+                    });
+                }
+            }
+            
+            animate() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                // Gradient de fond
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+                gradient.addColorStop(0, '#111827');
+                gradient.addColorStop(1, '#1F2937');
+                
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                // Mettre à jour et dessiner les particules
+                for (let i = 0; i < this.particles.length; i++) {
+                    const p = this.particles[i];
+                    
+                    p.sinOffset += 0.01;
+                    p.x += p.vx + Math.sin(p.sinOffset) * 0.2;
+                    p.y += p.vy + Math.cos(p.sinOffset) * 0.2;
+                    
+                    // Réapparaître de l'autre côté si la particule sort de l'écran
+                    if (p.x < 0) p.x = this.canvas.width;
+                    if (p.x > this.canvas.width) p.x = 0;
+                    if (p.y < 0) p.y = this.canvas.height;
+                    if (p.y > this.canvas.height) p.y = 0;
+                    
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    this.ctx.fillStyle = p.color;
+                    this.ctx.fill();
+                }
+                
+                // Dessiner des lignes entre les particules proches
+                for (let i = 0; i < this.particles.length; i++) {
+                    for (let j = i + 1; j < this.particles.length; j++) {
+                        const dx = this.particles[i].x - this.particles[j].x;
+                        const dy = this.particles[i].y - this.particles[j].y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (distance < 100) {
+                            this.ctx.beginPath();
+                            this.ctx.moveTo(this.particles[i].x, this.particles[i].y);
+                            this.ctx.lineTo(this.particles[j].x, this.particles[j].y);
+                            this.ctx.strokeStyle = `rgba(255, 255, 255, ${(100 - distance) / 1000})`;
+                            this.ctx.stroke();
+                        }
+                    }
+                }
+                
+                requestAnimationFrame(() => this.animate());
+            }
+        }
+
+        class Tetris {
+            constructor() {
+                // Éléments du DOM
+                this.gameBoard = document.getElementById('game-board');
+                this.nextPieceDisplay = document.getElementById('next-piece');
+                this.scoreDisplay = document.getElementById('score-display');
+                this.levelDisplay = document.getElementById('level-display');
+                this.linesDisplay = document.getElementById('lines-display');
+                this.gameOverScreen = document.getElementById('game-over');
+                this.finalScoreDisplay = document.getElementById('final-score');
+                this.startButton = document.getElementById('start-btn');
+                this.pauseButton = document.getElementById('pause-btn');
+                this.restartButton = document.getElementById('restart-btn');
+                this.particlesContainer = document.getElementById('particles');
+                this.powerUpDisplay = document.getElementById('power-up-display');
+                
+                // Configuration du jeu
+                this.ROWS = 20;
+                this.COLS = 10;
+                this.score = 0;
+                this.level = 1;
+                this.lines = 0;
+                this.gameOver = false;
+                this.isPaused = false;
+                this.gameSpeed = 1000; // Vitesse initiale en ms
+                this.grid = Array(this.ROWS).fill().map(() => Array(this.COLS).fill(0));
+                this.currentPiece = null;
+                this.nextPiece = null;
+                this.activePowerUps = [];
+                this.dropInterval = null;
+                this.powerUpInterval = null;
+                this.specialPieceChance = 0.05; // 5% de chance d'une pièce spéciale
+                
+                // Initialisation du jeu
+                this.init();
+            }
+            
+            init() {
+                // Création de la grille de jeu
+                this.createGrid();
+                this.createNextPieceDisplay();
+                
+                // Initialisation des pièces
+                this.nextPiece = this.getRandomPiece();
+                
+                // Gestion des événements
+                document.addEventListener('keydown', this.handleKeyPress.bind(this));
+                this.startButton.addEventListener('click', this.startGame.bind(this));
+                this.pauseButton.addEventListener('click', this.togglePause.bind(this));
+                this.restartButton.addEventListener('click', this.restartGame.bind(this));
+                
+                // Désactiver le bouton pause au début
+                this.pauseButton.disabled = true;
+            }
+            
+            createGrid() {
+                this.gameBoard.innerHTML = '';
+                for (let r = 0; r < this.ROWS; r++) {
+                    for (let c = 0; c < this.COLS; c++) {
+                        const cell = document.createElement('div');
+                        cell.classList.add('cell');
+                        cell.setAttribute('data-row', r);
+                        cell.setAttribute('data-col', c);
+                        this.gameBoard.appendChild(cell);
+                    }
+                }
+            }
+            
+            createNextPieceDisplay() {
+                this.nextPieceDisplay.innerHTML = '';
+                for (let r = 0; r < 4; r++) {
+                    for (let c = 0; c < 4; c++) {
+                        const cell = document.createElement('div');
+                        cell.classList.add('cell');
+                        this.nextPieceDisplay.appendChild(cell);
+                    }
+                }
+            }
+            
+            getRandomPiece() {
+                // Chance de générer une pièce spéciale
+                if (Math.random() < this.specialPieceChance) {
+                    return this.createPiece(SPECIAL_PIECE);
+                }
+                
+                // Pièces normales
+                const randomIndex = Math.floor(Math.random() * PIECES.length);
+                return this.createPiece(PIECES[randomIndex]);
+            }
+            
+            createPiece(pieceData) {
+                const piece = {
+                    shape: JSON.parse(JSON.stringify(pieceData.shape)),
+                    color: pieceData.color,
+                    glow: pieceData.glow,
+                    special: pieceData.special || false,
+                    row: 0,
+                    col: Math.floor((this.COLS - pieceData.shape[0].length) / 2)
+                };
+                
+                return piece;
+            }
+            
+            startGame() {
+                if (this.gameOver) {
+                    this.restartGame();
+                    return;
+                }
+                
+                this.currentPiece = this.nextPiece;
+                this.nextPiece = this.getRandomPiece();
+                this.drawPiece();
+                this.drawNextPiece();
+                
+                // Démarrer la chute automatique des pièces
+                this.dropInterval = setInterval(() => {
+                    this.moveDown();
+                }, this.gameSpeed);
+                
+                // Générer des power-ups périodiquement
+                this.powerUpInterval = setInterval(() => {
+                    if (!this.isPaused && !this.gameOver && Math.random() < 0.3) {
+                        this.spawnPowerUp();
+                    }
+                }, 10000); // Toutes les 10 secondes
+                
+                // Activer le bouton pause
+                this.pauseButton.disabled = false;
+                this.startButton.disabled = true;
+            }
+            
+            restartGame() {
+                // Réinitialiser toutes les variables de jeu
+                this.grid = Array(this.ROWS).fill().map(() => Array(this.COLS).fill(0));
+                this.score = 0;
+                this.level = 1;
+                this.lines = 0;
+                this.gameSpeed = 1000;
+                this.gameOver = false;
+                this.isPaused = false;
+                
+                // Nettoyer les timers existants
+                if (this.dropInterval) clearInterval(this.dropInterval);
+                if (this.powerUpInterval) clearInterval(this.powerUpInterval);
+                
+                // Nettoyer les power-ups
+                this.activePowerUps = [];
+                this.updatePowerUpDisplay();
+                
+                // Supprimer les power-ups visuels
+                const powerUps = document.querySelectorAll('.power-up');
+                powerUps.forEach(p => p.remove());
+                
+                // Supprimer les particules
+                this.particlesContainer.innerHTML = '';
+                
+                // Mettre à jour l'interface
+                this.updateScore();
+                
+                // Cacher l'écran de game over
+                this.gameOverScreen.style.display = 'none';
+                
+                // Recréer la grille
+                this.createGrid();
+                
+                // Réinitialiser les pièces
+                this.nextPiece = this.getRandomPiece();
+                
+                // Activer le bouton de démarrage
+                this.startButton.disabled = false;
+                this.pauseButton.disabled = true;
+            }
+            
+            togglePause() {
+                if (this.gameOver) return;
+                
+                this.isPaused = !this.isPaused;
+                
+                if (this.isPaused) {
+                    clearInterval(this.dropInterval);
+                    this.pauseButton.textContent = 'Reprendre';
+                } else {
+                    this.dropInterval = setInterval(() => {
+                        this.moveDown();
+                    }, this.gameSpeed);
+                    this.pauseButton.textContent = 'Pause';
+                }
+            }
+            
+            drawPiece() {
+                this.clearPiece();
+                
+                const { shape, row, col, color } = this.currentPiece;
+                
+                for (let r = 0; r < shape.length; r++) {
+                    for (let c = 0; c < shape[r].length; c++) {
+                        if (shape[r][c] !== 0) {
+                            const cellRow = row + r;
+                            const cellCol = col + c;
+                            
+                            if (cellRow >= 0) {
+                                const cell = document.querySelector(`[data-row="${cellRow}"][data-col="${cellCol}"]`);
+                                if (cell) {
+                                    cell.style.backgroundColor = color;
+                                    cell.style.boxShadow = `inset 0 0 5px ${this.currentPiece.glow}`;
+                                    cell.classList.add('occupied');
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            clearPiece() {
+                const cells = document.querySelectorAll('.cell:not(.placed)');
+                cells.forEach(cell => {
+                    cell.style.backgroundColor = '';
+                    cell.style.boxShadow = '';
+                    cell.classList.remove('occupied');
+                });
+            }
+            
+            drawNextPiece() {
+                // Effacer l'affichage de la prochaine pièce
+                const cells = this.nextPieceDisplay.querySelectorAll('.cell');
+                cells.forEach(cell => {
+                    cell.style.backgroundColor = '';
+                    cell.style.boxShadow = '';
+                    cell.classList.remove('occupied');
+                });
+                
+                const { shape, color, glow } = this.nextPiece;
+                
+                // Calculer le décalage pour centrer la pièce
+                const offsetRow = Math.floor((4 - shape.length) / 2);
+                const offsetCol = Math.floor((4 - shape[0].length) / 2);
+                
+                // Dessiner la pièce
+                for (let r = 0; r < shape.length; r++) {
+                    for (let c = 0; c < shape[r].length; c++) {
+                        if (shape[r][c] !== 0) {
+                            const index = (r + offsetRow) * 4 + (c + offsetCol);
+                            if (cells[index]) {
+                                cells[index].style.backgroundColor = color;
+                                cells[index].style.boxShadow = `inset 0 0 5px ${glow}`;
+                                cells[index].classList.add('occupied');
+                            }
+                        }
+                    }
+                }
+            }
+            
+            moveDown() {
+                if (this.isPaused || this.gameOver) return;
+                
+                this.clearPiece();
+                this.currentPiece.row++;
+                
+                if (this.checkCollision()) {
+                    this.currentPiece.row--;
+                    this.placePiece();
+                    this.clearLines();
+                    
+                    // Vérifier la défaite
+                    if (this.checkGameOver()) {
+                        this.endGame();
+                        return;
+                    }
+                    
+                    // Nouvelle pièce
+                    this.currentPiece = this.nextPiece;
+                    this.nextPiece = this.getRandomPiece();
+                    
+                    // Si la nouvelle pièce cause déjà une collision, c'est game over
+                    if (this.checkCollision()) {
+                        this.endGame();
+                        return;
+                    }
+                    
+                    this.drawNextPiece();
+                }
+                
+                this.drawPiece();
+            }
+            
+            moveLeft() {
+                if (this.isPaused || this.gameOver) return;
+                
+                this.clearPiece();
+                this.currentPiece.col--;
+                
+                if (this.checkCollision()) {
+                    this.currentPiece.col++;
+                }
+                
+                this.drawPiece();
+            }
+            
+            moveRight() {
+                if (this.isPaused || this.gameOver) return;
+                
+                this.clearPiece();
+                this.currentPiece.col++;
+                
+                if (this.checkCollision()) {
+                    this.currentPiece.col--;
+                }
+                
+                this.drawPiece();
+            }
+            
+            rotate() {
+                if (this.isPaused || this.gameOver) return;
+                
+                this.clearPiece();
+                
+                // Sauvegarde de la forme actuelle au cas où la rotation est impossible
+                const oldShape = JSON.parse(JSON.stringify(this.currentPiece.shape));
+                
+                // Rotation de la matrice
+                const newShape = Array(oldShape[0].length).fill().map(() => Array(oldShape.length).fill(0));
+                
+                for (let r = 0; r < oldShape.length; r++) {
+                    for (let c = 0; c < oldShape[r].length; c++) {
+                        newShape[c][oldShape.length - 1 - r] = oldShape[r][c];
+                    }
+                }
+                
+                this.currentPiece.shape = newShape;
+                
+                // Vérifier si la rotation cause une collision
+                if (this.checkCollision()) {
+                    // Tenter un wall kick (décalage à gauche ou à droite)
+                    const originalCol = this.currentPiece.col;
+                    
+                    // Essayer de décaler à gauche
+                    this.currentPiece.col--;
+                    if (this.checkCollision()) {
+                        // Essayer de décaler à droite
+                        this.currentPiece.col = originalCol + 1;
+                        if (this.checkCollision()) {
+                            // Si les deux échouent, annuler la rotation
+                            this.currentPiece.col = originalCol;
+                            this.currentPiece.shape = oldShape;
+                        }
+                    }
+                }
+                
+                this.drawPiece();
+            }
+            
+            hardDrop() {
+                if (this.isPaused || this.gameOver) return;
+                
+                while (!this.checkCollision()) {
+                    this.clearPiece();
+                    this.currentPiece.row++;
+                }
+                
+                this.currentPiece.row--;
+                this.drawPiece();
+                
+                // Placer la pièce immédiatement
+                this.placePiece();
+                this.clearLines();
+                
+                // Vérifier la défaite
+                if (this.checkGameOver()) {
+                    this.endGame();
+                    return;
+                }
+                
+                // Nouvelle pièce
+                this.currentPiece = this.nextPiece;
+                this.nextPiece = this.getRandomPiece();
+                
+                if (this.checkCollision()) {
+                    this.endGame();
+                    return;
+                }
+                
+                this.drawNextPiece();
+                this.drawPiece();
+            }
+            
+            checkCollision() {
+                const { shape, row, col } = this.currentPiece;
+                
+                for (let r = 0; r < shape.length; r++) {
+                    for (let c = 0; c < shape[r].length; c++) {
+                        if (shape[r][c] !== 0) {
+                            const newRow = row + r;
+                            const newCol = col + c;
+                            
+                            // Vérifier les limites du plateau
+                            if (newCol < 0 || newCol >= this.COLS || newRow >= this.ROWS) {
+                                return true;
+                            }
+                            
+                            // Vérifier si l'emplacement est déjà occupé
+                            if (newRow >= 0 && this.grid[newRow][newCol] !== 0) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                
+                return false;
+            }
+            
+            placePiece() {
+                const { shape, row, col, color, special } = this.currentPiece;
+                
+                // Ajouter un peu de tremblement lors du placement
+                this.gameBoard.classList.add('shake');
+                setTimeout(() => {
+                    this.gameBoard.classList.remove('shake');
+                }, 500);
+                
+                for (let r = 0; r < shape.length; r++) {
+                    for (let c = 0; c < shape[r].length; c++) {
+                        if (shape[r][c] !== 0) {
+                            const cellRow = row + r;
+                            const cellCol = col + c;
+                            
+                            if (cellRow >= 0) {
+                                // Mettre à jour la grille logique
+                                this.grid[cellRow][cellCol] = { color, glow: this.currentPiece.glow };
+                                
+                                // Mettre à jour la grille visuelle
+                                const cell = document.querySelector(`[data-row="${cellRow}"][data-col="${cellCol}"]`);
+                                if (cell) {
+                                    cell.classList.add('placed');
+                                    
+                                    // Effet de particules pour les pièces spéciales
+                                    if (special) {
+                                        this.createParticles(cell.offsetLeft, cell.offsetTop, color);
+                                        
+                                        // Ajouter un power-up aléatoire
+                                        this.addRandomPowerUp();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            clearLines() {
+                let linesCleared = 0;
+                
+                for (let r = this.ROWS - 1; r >= 0; r--) {
+                    // Vérifier si la ligne est complète
+                    if (this.grid[r].every(cell => cell !== 0)) {
+                        // Effet visuel de la ligne effacée
+                        this.createLineClearEffect(r);
+                        
+                        // Particules pour chaque cellule
+                        for (let c = 0; c < this.COLS; c++) {
+                            const cell = document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+                            if (cell) {
+                                const color = this.grid[r][c].color;
+                                this.createParticles(cell.offsetLeft, cell.offsetTop, color);
+                            }
+                        }
+                        
+                        // Déplacer toutes les lignes au-dessus vers le bas
+                        for (let row = r; row > 0; row--) {
+                            this.grid[row] = [...this.grid[row - 1]];
+                        }
+                        
+                        // Vider la première ligne
+                        this.grid[0] = Array(this.COLS).fill(0);
+                        
+                        // Incrémenter le compteur de lignes effacées
+                        linesCleared++;
+                        
+                        // Puisqu'on a déplacé les lignes, on doit revérifier la même ligne
+                        r++;
+                    }
+                }
+                
+                // Mettre à jour la grille visuelle
+                this.updateGridDisplay();
+                
+                // Mettre à jour le score et le niveau
+                if (linesCleared > 0) {
+                    this.updateScore(linesCleared);
+                    
+                    // Effets spéciaux pour les combos
+                    if (linesCleared >= 4) {
+                        this.gameBoard.classList.add('glow');
+                        setTimeout(() => {
+                            this.gameBoard.classList.remove('glow');
+                        }, 1000);
+                    }
+                }
+            }
+            
+            createLineClearEffect(row) {
+                const effect = document.createElement('div');
+                effect.classList.add('line-clear-effect');
+                effect.style.top = `${row * 25}px`; // 25px est la taille de la cellule
+                
+                this.gameBoard.appendChild(effect);
+                
+                // Supprimer l'effet après l'animation
+                setTimeout(() => {
+                    effect.remove();
+                }, 500);
+            }
+            
+            updateGridDisplay() {
+                for (let r = 0; r < this.ROWS; r++) {
+                    for (let c = 0; c < this.COLS; c++) {
+                        const cell = document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+                        if (cell) {
+                            if (this.grid[r][c] !== 0) {
+                                cell.style.backgroundColor = this.grid[r][c].color;
+                                cell.style.boxShadow = `inset 0 0 5px ${this.grid[r][c].glow}`;
+                                cell.classList.add('occupied', 'placed');
+                            } else {
+                                cell.style.backgroundColor = '';
+                                cell.style.boxShadow = '';
+                                cell.classList.remove('occupied', 'placed');
+                            }
+                        }
+                    }
+                }
+            }
+            
+            updateScore(linesCleared = 0) {
+                if (linesCleared > 0) {
+                    // Points basés sur le nombre de lignes effacées
+                    const points = [0, 100, 300, 500, 800][linesCleared] * this.level;
+                    this.score += points;
+                    
+                    // Mettre à jour le compteur de lignes
+                    this.lines += linesCleared;
+                    
+                    // Mettre à jour le niveau
+                    const newLevel = Math.floor(this.lines / 10) + 1;
+                    if (newLevel > this.level) {
+                        this.level = newLevel;
+                        
+                        // Augmenter la vitesse du jeu
+                        this.gameSpeed = Math.max(100, 1000 - (this.level - 1) * 100);
+                        clearInterval(this.dropInterval);
+                        this.dropInterval = setInterval(() => {
+                            this.moveDown();
+                        }, this.gameSpeed);
+                        
+                        // Augmenter la chance de pièces spéciales
+                        this.specialPieceChance = Math.min(0.2, 0.05 + (this.level - 1) * 0.01);
+                    }
+                }
+                
+                // Mettre à jour l'affichage
+                this.scoreDisplay.textContent = this.score;
+                this.levelDisplay.textContent = this.level;
+                this.linesDisplay.textContent = this.lines;
+            }
+            
+            checkGameOver() {
+                // Si une pièce est placée au-dessus de la grille, c'est game over
+                return this.grid[0].some(cell => cell !== 0);
+            }
+            
+            endGame() {
+                this.gameOver = true;
+                clearInterval(this.dropInterval);
+                clearInterval(this.powerUpInterval);
+                
+                // Afficher l'écran de game over
+                this.finalScoreDisplay.textContent = this.score;
+                this.gameOverScreen.style.display = 'flex';
+                
+                // Désactiver les boutons
+                this.pauseButton.disabled = true;
+            }
+            
+            createParticles(x, y, color) {
+                for (let i = 0; i < 15; i++) {
+                    const particle = document.createElement('div');
+                    particle.classList.add('particle');
+                    
+                    // Calculer la position absolue
+                    const absoluteX = this.gameBoard.offsetLeft + x;
+                    const absoluteY = this.gameBoard.offsetTop + y;
+                    
+                    particle.style.left = `${absoluteX + Math.random() * 25}px`;
+                    particle.style.top = `${absoluteY + Math.random() * 25}px`;
+                    particle.style.backgroundColor = color;
+                    
+                    // Animation des particules
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = Math.random() * 3 + 2;
+                    const vx = Math.cos(angle) * speed;
+                    const vy = Math.sin(angle) * speed;
+                    const size = Math.random() * 4 + 2;
+                    
+                    particle.style.width = `${size}px`;
+                    particle.style.height = `${size}px`;
+                    
+                    this.particlesContainer.appendChild(particle);
+                    
+                    let posX = parseFloat(particle.style.left);
+                    let posY = parseFloat(particle.style.top);
+                    let opacity = 1;
+                    
+                    const animate = () => {
+                        posX += vx;
+                        posY += vy;
+                        opacity -= 0.02;
+                        
+                        particle.style.left = `${posX}px`;
+                        particle.style.top = `${posY}px`;
+                        particle.style.opacity = opacity;
+                        
+                        if (opacity > 0) {
+                            requestAnimationFrame(animate);
+                        } else {
+                            particle.remove();
+                        }
+                    };
+                    
+                    requestAnimationFrame(animate);
+                }
+            }
+            
+            spawnPowerUp() {
+                const powerUp = document.createElement('div');
+                powerUp.classList.add('power-up');
+                
+                // Position aléatoire dans la grille
+                const row = Math.floor(Math.random() * (this.ROWS - 5)) + 5;
+                const col = Math.floor(Math.random() * this.COLS);
+                
+                const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+                if (cell && this.grid[row][col] === 0) {
+                    const rect = cell.getBoundingClientRect();
+                    const boardRect = this.gameBoard.getBoundingClientRect();
+                    
+                    powerUp.style.left = `${rect.left - boardRect.left}px`;
+                    powerUp.style.top = `${rect.top - boardRect.top}px`;
+                    
+                    powerUp.addEventListener('click', () => {
+                        this.collectPowerUp(powerUp);
+                    });
+                    
+                    this.gameBoard.appendChild(powerUp);
+                    
+                    // Auto-suppression après 10 secondes
+                    setTimeout(() => {
+                        if (powerUp.parentNode) {
+                            powerUp.remove();
+                        }
+                    }, 10000);
+                }
+            }
+            
+            collectPowerUp(powerUpElement) {
+                // Animation lors de la collecte
+                this.createParticles(
+                    parseFloat(powerUpElement.style.left) + 15,
+                    parseFloat(powerUpElement.style.top) + 15,
+                    '#f39c12'
+                );
+                
+                // Ajouter le power-up à la liste active
+                this.addRandomPowerUp();
+                
+                // Supprimer l'élément visuel
+                powerUpElement.remove();
+            }
+            
+            addRandomPowerUp() {
+                const powerUps = [
+                    { id: 'clear', name: 'Effacer', use: () => this.useClearPowerUp() },
+                    { id: 'slow', name: 'Ralentir', use: () => this.useSlowPowerUp() },
+                    { id: 'bomb', name: 'Bombe', use: () => this.useBombPowerUp() }
+                ];
+                
+                const randomPowerUp = powerUps[Math.floor(Math.random() * powerUps.length)];
+                this.activePowerUps.push(randomPowerUp);
+                
+                // Mettre à jour l'affichage des power-ups
+                this.updatePowerUpDisplay();
+            }
+            
+            updatePowerUpDisplay() {
+                this.powerUpDisplay.innerHTML = '';
+                
+                this.activePowerUps.forEach((powerUp, index) => {
+                    const icon = document.createElement('div');
+                    icon.classList.add('power-up-icon');
+                    icon.textContent = powerUp.name.charAt(0);
+                    icon.title = powerUp.name;
+                    icon.setAttribute('data-index', index);
+                    
+                    // Cliquer pour utiliser
+                    icon.addEventListener('click', () => {
+                        if (!this.isPaused && !this.gameOver) {
+                            powerUp.use();
+                            this.activePowerUps.splice(index, 1);
+                            this.updatePowerUpDisplay();
+                        }
+                    });
+                    
+                    this.powerUpDisplay.appendChild(icon);
+                });
+            }
+            
+            useClearPowerUp() {
+                // Effacer la ligne du bas
+                const bottomRow = this.ROWS - 1;
+                
+                // Créer l'effet visuel
+                this.createLineClearEffect(bottomRow);
+                
+                // Effet de particules pour chaque cellule
+                for (let c = 0; c < this.COLS; c++) {
+                    const cell = document.querySelector(`[data-row="${bottomRow}"][data-col="${c}"]`);
+                    if (cell && this.grid[bottomRow][c] !== 0) {
+                        const color = this.grid[bottomRow][c].color;
+                        this.createParticles(cell.offsetLeft, cell.offsetTop, color);
+                    }
+                }
+                
+                // Déplacer toutes les lignes vers le bas
+                for (let row = this.ROWS - 1; row > 0; row--) {
+                    this.grid[row] = [...this.grid[row - 1]];
+                }
+                
+                // Vider la première ligne
+                this.grid[0] = Array(this.COLS).fill(0);
+                
+                // Mettre à jour la grille visuelle
+                this.updateGridDisplay();
+                
+                // Ajouter des points
+                this.updateScore(1);
+            }
+            
+            useSlowPowerUp() {
+                // Doubler la vitesse de jeu temporairement
+                const originalSpeed = this.gameSpeed;
+                this.gameSpeed *= 2;
+                
+                clearInterval(this.dropInterval);
+                this.dropInterval = setInterval(() => {
+                    this.moveDown();
+                }, this.gameSpeed);
+                
+                // Effet visuel
+                this.gameBoard.classList.add('glow');
+                
+                // Revenir à la vitesse normale après 10 secondes
+                setTimeout(() => {
+                    this.gameSpeed = originalSpeed;
+                    this.gameBoard.classList.remove('glow');
+                    
+                    if (!this.isPaused && !this.gameOver) {
+                        clearInterval(this.dropInterval);
+                        this.dropInterval = setInterval(() => {
+                            this.moveDown();
+                        }, this.gameSpeed);
+                    }
+                }, 10000);
+            }
+            
+            useBombPowerUp() {
+                const { row, col } = this.currentPiece;
+                
+                // Effacer les cellules autour de la pièce actuelle
+                for (let r = Math.max(0, row - 1); r < Math.min(this.ROWS, row + 4); r++) {
+                    for (let c = Math.max(0, col - 1); c < Math.min(this.COLS, col + 4); c++) {
+                        if (this.grid[r][c] !== 0) {
+                            // Effet de particules
+                            const cell = document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+                            if (cell) {
+                                const color = this.grid[r][c].color;
+                                this.createParticles(cell.offsetLeft, cell.offsetTop, color);
+                            }
+                            
+                            // Effacer la cellule
+                            this.grid[r][c] = 0;
+                        }
+                    }
+                }
+                
+                // Faire "tomber" les blocs au-dessus des espaces vides
+                for (let c = 0; c < this.COLS; c++) {
+                    const column = [];
+                    
+                    // Collecter toutes les cellules non vides
+                    for (let r = 0; r < this.ROWS; r++) {
+                        if (this.grid[r][c] !== 0) {
+                            column.push(this.grid[r][c]);
+                        }
+                    }
+                    
+                    // Remplir du haut avec des espaces vides
+                    while (column.length < this.ROWS) {
+                        column.unshift(0);
+                    }
+                    
+                    // Mettre à jour la colonne dans la grille
+                    for (let r = 0; r < this.ROWS; r++) {
+                        this.grid[r][c] = column[r];
+                    }
+                }
+                
+                // Mettre à jour l'affichage
+                this.updateGridDisplay();
+                
+                // Effet visuel
+                this.gameBoard.classList.add('shake');
+                setTimeout(() => {
+                    this.gameBoard.classList.remove('shake');
+                }, 500);
+                
+                // Ajouter des points
+                this.score += 500;
+                this.updateScore();
+            }
+            
+            handleKeyPress(event) {
+                if (this.gameOver) return;
+                
+                switch (event.key) {
+                    case 'ArrowLeft':
+                        this.moveLeft();
+                        break;
+                    case 'ArrowRight':
+                        this.moveRight();
+                        break;
+                    case 'ArrowDown':
+                        this.moveDown();
+                        break;
+                    case 'ArrowUp':
+                        this.rotate();
+                        break;
+                    case ' ':
+                        this.hardDrop();
+                        break;
+                    case 'p':
+                    case 'P':
+                        if (!this.startButton.disabled) {
+                            this.togglePause();
+                        }
+                        break;
+                }
+            }
+        }
+
+        // Démarrer le jeu lorsque la page est chargée
+        window.addEventListener('load', () => {
+            new BackgroundEffect();
+            new Tetris();
+        });
+    </script>
+</body>
+</html>
